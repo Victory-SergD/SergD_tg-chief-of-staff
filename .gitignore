@@ -1,0 +1,88 @@
+# ═══════════════════════════════════════════════════════════════
+# tg-chief-of-staff — .gitignore
+# ═══════════════════════════════════════════════════════════════
+
+# ──── СЕКРЕТЫ / КРЕДЕНШЛЫ ────
+.env
+.env.local
+.env.bak_*
+.tokens.env
+.tg_notify.json
+.tg_anastasya_bot.json
+*.key
+*.pem
+
+# ──── TELEGRAM SESSION (полный доступ к аккаунту!) ────
+tg_access/
+*.session
+*.session-journal
+
+# ──── БАЗА ДАННЫХ (вся переписка 6200 контактов) ────
+tg_analiz.db
+tg_analiz.db-shm
+tg_analiz.db-wal
+*.db
+*.db-shm
+*.db-wal
+
+# ──── ПЕРСОНАЛЬНЫЕ ВЫГРУЗКИ ПО КОМАНДЕ ────
+work_chats_review.md
+work_chats_review.md.bak_*
+pending_questions.md
+pending_questions_v2.md
+pending_questions_*.md
+critical_for_anastasya.md
+critical_for_anastasya_*.md
+critical_for_sergei.md
+critical_for_sergei_*.md
+critical_for_subordinates.md
+critical_for_subordinates_*.md
+tasks_for_anastasya.md
+questions_per_contact_INDEX.md
+vdl_projects_table.txt
+
+# ──── ВЫГРУЗКИ ПО КОНТАКТАМ / БАТЧИ ────
+output/
+per_contact_questions/
+cleanup_batches/
+cleanup_channels_batches/
+reports/
+agency_victory/
+third_party_telegram_archive/
+
+# ──── СВАЛКА / LEGACY ────
+_junkyard/
+junk/
+
+# ──── ЛОКАЛЬНОЕ СОСТОЯНИЕ ────
+.pipeline_state.json
+.pipeline.lock
+.pipeline.lock.d/
+.workflow_monitor_state.json
+.voices_tmp/
+logs/
+*.log
+unsubscribe_log.json
+
+# ──── PYTHON ────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# ──── OS / IDE ────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ──── ZIPы / БЭКАПЫ ────
+*.zip
+*.tar.gz
+*.bak
