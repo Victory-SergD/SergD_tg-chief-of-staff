@@ -35,9 +35,25 @@ def save_config(cfg: dict):
     print(f"💾 Config saved: {CONFIG}")
 
 
+def _get_opener():
+    """urllib opener с HTTP-прокси если задан BOT_API_PROXY / GEMINI_PROXY.
+
+    Bot API доступен через HTTPS — HTTP-прокси с CONNECT работает (curl-тест прошёл).
+    Используем GEMINI_PROXY как общий HTTP-прокси для исходящих HTTPS запросов
+    (если только не задан отдельный BOT_API_PROXY).
+    """
+    proxy = os.environ.get("BOT_API_PROXY") or os.environ.get("GEMINI_PROXY") or ""
+    proxy = proxy.strip()
+    if proxy:
+        handler = urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+        return urllib.request.build_opener(handler)
+    return urllib.request.build_opener()
+
+
 def get_updates(token: str) -> list:
     url = f"https://api.telegram.org/bot{token}/getUpdates"
-    with urllib.request.urlopen(url, timeout=30) as resp:
+    opener = _get_opener()
+    with opener.open(url, timeout=30) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     return data.get("result", [])
 
@@ -50,6 +66,7 @@ def send_message(token: str, chat_id: int, text: str,
     MAX = 4000
     chunks = [text[i:i+MAX] for i in range(0, len(text), MAX)] if len(text) > MAX else [text]
     success = True
+    opener = _get_opener()
     for chunk in chunks:
         body = {
             "chat_id": chat_id,
@@ -60,7 +77,7 @@ def send_message(token: str, chat_id: int, text: str,
             body["parse_mode"] = parse_mode
         data = urllib.parse.urlencode(body).encode("utf-8")
         try:
-            with urllib.request.urlopen(url, data=data, timeout=30) as resp:
+            with opener.open(url, data=data, timeout=30) as resp:
                 resp_data = json.loads(resp.read().decode("utf-8"))
                 if not resp_data.get("ok"):
                     print(f"  ! Telegram: {resp_data}")
