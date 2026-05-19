@@ -7,16 +7,27 @@ import tg_notify
 tg_notify.send("текст сообщения")
 
 Setup (запустить ОДИН РАЗ): python3 tg_notify.py setup
+
+Прокси:
+- BOT_API_PROXY (явный override, http/https/socks5)
+- TG_PROXY (тот же что для Telethon — socks5://… на :1080, живой)
+- GEMINI_PROXY (legacy HTTP-прокси на :8888 — fallback если есть)
 """
 import json
 import os
 import sys
-import urllib.parse
-import urllib.request
 from pathlib import Path
+
+import requests
 
 BASE = Path(__file__).parent
 CONFIG = BASE / ".tg_notify.json"
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE / ".env")
+except Exception:
+    pass
 
 DEFAULT_TOKEN = os.environ.get("TG_BOT_TOKEN", "")
 
@@ -35,27 +46,31 @@ def save_config(cfg: dict):
     print(f"💾 Config saved: {CONFIG}")
 
 
-def _get_opener():
-    """urllib opener с HTTP-прокси если задан BOT_API_PROXY / GEMINI_PROXY.
+def _proxies_dict():
+    """Возвращает dict для requests `proxies=`. None если прокси не нужен.
 
-    Bot API доступен через HTTPS — HTTP-прокси с CONNECT работает (curl-тест прошёл).
-    Используем GEMINI_PROXY как общий HTTP-прокси для исходящих HTTPS запросов
-    (если только не задан отдельный BOT_API_PROXY).
+    Приоритет: BOT_API_PROXY > TG_PROXY > GEMINI_PROXY.
+    Для SOCKS5 принудительно используем `socks5h://` чтобы DNS резолвился
+    через прокси (критично из РФ — api.telegram.org заблокирован).
     """
-    proxy = os.environ.get("BOT_API_PROXY") or os.environ.get("GEMINI_PROXY") or ""
-    proxy = proxy.strip()
-    if proxy:
-        handler = urllib.request.ProxyHandler({"http": proxy, "https": proxy})
-        return urllib.request.build_opener(handler)
-    return urllib.request.build_opener()
+    raw = (
+        os.environ.get("BOT_API_PROXY")
+        or os.environ.get("TG_PROXY")
+        or os.environ.get("GEMINI_PROXY")
+        or ""
+    ).strip()
+    if not raw:
+        return None
+    if raw.startswith("socks5://"):
+        raw = "socks5h://" + raw[len("socks5://"):]
+    return {"http": raw, "https": raw}
 
 
 def get_updates(token: str) -> list:
     url = f"https://api.telegram.org/bot{token}/getUpdates"
-    opener = _get_opener()
-    with opener.open(url, timeout=30) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    return data.get("result", [])
+    r = requests.get(url, timeout=30, proxies=_proxies_dict())
+    r.raise_for_status()
+    return r.json().get("result", [])
 
 
 def send_message(token: str, chat_id: int, text: str,
@@ -66,7 +81,7 @@ def send_message(token: str, chat_id: int, text: str,
     MAX = 4000
     chunks = [text[i:i+MAX] for i in range(0, len(text), MAX)] if len(text) > MAX else [text]
     success = True
-    opener = _get_opener()
+    proxies = _proxies_dict()
     for chunk in chunks:
         body = {
             "chat_id": chat_id,
@@ -75,13 +90,12 @@ def send_message(token: str, chat_id: int, text: str,
         }
         if parse_mode:
             body["parse_mode"] = parse_mode
-        data = urllib.parse.urlencode(body).encode("utf-8")
         try:
-            with opener.open(url, data=data, timeout=30) as resp:
-                resp_data = json.loads(resp.read().decode("utf-8"))
-                if not resp_data.get("ok"):
-                    print(f"  ! Telegram: {resp_data}")
-                    success = False
+            r = requests.post(url, data=body, timeout=30, proxies=proxies)
+            resp_data = r.json()
+            if not resp_data.get("ok"):
+                print(f"  ! Telegram: {resp_data}")
+                success = False
         except Exception as e:
             print(f"  ! Send err: {e}")
             success = False
